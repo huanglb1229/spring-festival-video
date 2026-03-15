@@ -28,7 +28,6 @@ async function createVideoTask(prompt: string, imageUrl?: string) {
   };
   
   console.log('发送请求到:', url);
-  console.log('请求参数:', JSON.stringify(payload, null, 2));
   
   const response = await fetch(url, {
     method: 'POST',
@@ -39,12 +38,10 @@ async function createVideoTask(prompt: string, imageUrl?: string) {
     body: JSON.stringify(payload)
   });
   
-  console.log('响应状态码:', response.status);
-  
   if (!response.ok) {
     const errorText = await response.text();
     console.error('API 错误响应:', errorText);
-    throw new Error(`API 请求失败: ${response.status} - ${errorText}`);
+    throw new Error(`API 请求失败: ${response.status}`);
   }
   
   const result = await response.json();
@@ -69,61 +66,40 @@ async function getTaskStatus(taskId: string) {
   return response.json();
 }
 
-async function waitForTaskCompletion(taskId: string, maxWait = 120, checkInterval = 10) {
-  const startTime = Date.now();
-  
-  while (Date.now() - startTime < maxWait * 1000) {
-    const status = await getTaskStatus(taskId);
-    console.log('任务状态:', status.status);
-    
-    if (status.status === 'succeeded') {
-      return status;
-    } else if (status.status === 'failed') {
-      throw new Error('视频生成失败: ' + JSON.stringify(status));
-    }
-    
-    await new Promise(resolve => setTimeout(resolve, checkInterval * 1000));
-  }
-  
-  throw new Error('等待超时，请稍后重试');
-}
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { image, style } = body;
+    const { image, style, taskId, action } = body;
 
-    console.log('收到视频生成请求:', { 
-      hasImage: !!image, 
-      styleName: style.name,
-      dialogue: style.dialogue
-    });
-
-    const dialogueText = style.dialogue.join('，说：');
-    const fullPrompt = `${style.prompt}，说：${dialogueText}`;
-    
-    console.log('构建的提示词:', fullPrompt);
-    console.log('使用的图片URL:', image ? '已提供' : '未提供');
-    
-    const taskId = await createVideoTask(fullPrompt, image);
-    
-    console.log('任务创建成功:', taskId);
-    
-    const result = await waitForTaskCompletion(taskId);
-    
-    if (result.status === 'succeeded') {
-      const videoUrl = result.content?.video_url || result.result?.video_url;
-      
-      console.log('视频生成成功，URL:', videoUrl);
+    if (action === 'check-status' && taskId) {
+      console.log('检查任务状态:', taskId);
+      const status = await getTaskStatus(taskId);
+      console.log('任务状态:', status.status);
       
       return NextResponse.json({
         success: true,
-        message: '视频生成成功',
-        videoUrl: videoUrl || 'https://www.w3schools.com/html/mov_bbb.mp4'
+        status: status.status,
+        videoUrl: status.content?.video_url || status.result?.video_url
       });
     }
+
+    console.log('创建视频生成任务:', { 
+      hasImage: !!image, 
+      styleName: style?.name
+    });
+
+    const dialogueText = style?.dialogue?.join('，说：') || '';
+    const fullPrompt = `${style?.prompt || ''}，说：${dialogueText}`;
     
-    throw new Error('视频生成失败');
+    const newTaskId = await createVideoTask(fullPrompt, image);
+    
+    console.log('任务创建成功:', newTaskId);
+    
+    return NextResponse.json({
+      success: true,
+      message: '任务已创建，请等待生成',
+      taskId: newTaskId
+    });
   } catch (error) {
     console.error('视频生成失败:', error);
     const errorMessage = error instanceof Error ? error.message : '未知错误';

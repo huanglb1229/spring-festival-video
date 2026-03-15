@@ -75,17 +75,61 @@ export default function Home() {
 
       const data = await response.json();
       
-      if (data.success) {
-        setGeneratedVideo(data.videoUrl);
+      if (data.success && data.taskId) {
+        console.log('任务已创建，开始轮询:', data.taskId);
+        await pollForVideo(data.taskId);
       } else {
-        throw new Error(data.message);
+        throw new Error(data.message || '创建任务失败');
       }
     } catch (error) {
       console.error('生成视频失败:', error);
       alert('生成视频失败，请重试');
-    } finally {
       setIsGeneratingVideo(false);
     }
+  };
+
+  const pollForVideo = async (taskId: string) => {
+    let attempts = 0;
+    const maxAttempts = 60;
+    
+    while (attempts < maxAttempts) {
+      try {
+        const response = await fetch('/api/generate-video', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            taskId,
+            action: 'check-status'
+          }),
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+          console.log('任务状态:', data.status);
+          
+          if (data.status === 'succeeded' && data.videoUrl) {
+            setGeneratedVideo(data.videoUrl);
+            setIsGeneratingVideo(false);
+            return;
+          } else if (data.status === 'failed') {
+            throw new Error('视频生成失败');
+          }
+        }
+        
+        attempts++;
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      } catch (error) {
+        console.error('轮询失败:', error);
+        attempts++;
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
+    }
+    
+    setIsGeneratingVideo(false);
+    alert('生成超时，请稍后重试');
   };
 
   const resetAll = () => {
