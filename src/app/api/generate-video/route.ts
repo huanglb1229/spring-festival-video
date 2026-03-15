@@ -27,8 +27,6 @@ async function createVideoTask(prompt: string, imageUrl?: string) {
     content
   };
   
-  console.log('发送请求到:', url);
-  
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -38,14 +36,18 @@ async function createVideoTask(prompt: string, imageUrl?: string) {
     body: JSON.stringify(payload)
   });
   
+  const responseText = await response.text();
+  
   if (!response.ok) {
-    const errorText = await response.text();
-    console.error('API 错误响应:', errorText);
     throw new Error(`API 请求失败: ${response.status}`);
   }
   
-  const result = await response.json();
-  console.log('API 响应:', result);
+  let result;
+  try {
+    result = JSON.parse(responseText);
+  } catch {
+    throw new Error('API 响应格式错误');
+  }
   
   if (!result.id) {
     throw new Error('API 响应中没有找到任务 ID');
@@ -63,7 +65,13 @@ async function getTaskStatus(taskId: string) {
     }
   });
   
-  return response.json();
+  const responseText = await response.text();
+  
+  try {
+    return JSON.parse(responseText);
+  } catch {
+    throw new Error('API 响应格式错误');
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -72,9 +80,7 @@ export async function POST(request: NextRequest) {
     const { image, style, taskId, action } = body;
 
     if (action === 'check-status' && taskId) {
-      console.log('检查任务状态:', taskId);
       const status = await getTaskStatus(taskId);
-      console.log('任务状态:', status.status);
       
       return NextResponse.json({
         success: true,
@@ -83,17 +89,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    console.log('创建视频生成任务:', { 
-      hasImage: !!image, 
-      styleName: style?.name
-    });
-
     const dialogueText = style?.dialogue?.join('，说：') || '';
     const fullPrompt = `${style?.prompt || ''}，说：${dialogueText}`;
     
     const newTaskId = await createVideoTask(fullPrompt, image);
-    
-    console.log('任务创建成功:', newTaskId);
     
     return NextResponse.json({
       success: true,
@@ -101,7 +100,6 @@ export async function POST(request: NextRequest) {
       taskId: newTaskId
     });
   } catch (error) {
-    console.error('视频生成失败:', error);
     const errorMessage = error instanceof Error ? error.message : '未知错误';
     return NextResponse.json(
       { success: false, message: errorMessage },
