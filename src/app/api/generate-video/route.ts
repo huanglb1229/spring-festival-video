@@ -6,16 +6,16 @@ const API_BASE = 'https://ark.cn-beijing.volces.com/api/v3/contents/generations'
 async function createVideoTask(prompt: string, imageUrl?: string) {
   const url = `${API_BASE}/tasks`;
   
-  const content = [
+  const content: any[] = [
     {
-      type: 'text' as const,
+      type: 'text',
       text: `${prompt} --duration 5 --camerafixed false --watermark true`
     }
   ];
   
   if (imageUrl) {
     content.push({
-      type: 'image_url' as const,
+      type: 'image_url',
       image_url: {
         url: imageUrl
       }
