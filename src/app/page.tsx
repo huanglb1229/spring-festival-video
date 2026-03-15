@@ -14,18 +14,29 @@ export default function Home() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        alert('图片太大了，请选择小于 10MB 的图片');
+        return;
+      }
+      
       const reader = new FileReader();
       reader.onload = (event) => {
         setSelectedImage(event.target?.result as string);
         setGeneratedImage(null);
         setGeneratedVideo(null);
       };
+      reader.onerror = () => {
+        alert('图片读取失败，请重试');
+      };
       reader.readAsDataURL(file);
     }
   };
 
   const handleGenerateImage = async () => {
-    if (!selectedImage || !selectedStyle) return;
+    if (!selectedImage || !selectedStyle) {
+      alert('请先上传照片并选择风格');
+      return;
+    }
     
     setIsGeneratingImage(true);
     
@@ -46,11 +57,12 @@ export default function Home() {
       if (data.success) {
         setGeneratedImage(data.imageUrl);
       } else {
-        throw new Error(data.message);
+        throw new Error(data.message || '生成图片失败');
       }
     } catch (error) {
       console.error('生成图片失败:', error);
-      alert('生成图片失败，请重试');
+      const errorMessage = error instanceof Error ? error.message : '生成图片失败，请重试';
+      alert(errorMessage);
     } finally {
       setIsGeneratingImage(false);
     }

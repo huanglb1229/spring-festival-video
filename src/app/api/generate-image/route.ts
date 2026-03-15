@@ -10,9 +10,15 @@ export async function POST(request: NextRequest) {
 
     console.log('收到图片生成请求:', { 
       hasImage: !!image,
-      styleName: style.name,
-      prompt: style.prompt
+      styleName: style?.name
     });
+
+    if (!style) {
+      return NextResponse.json(
+        { success: false, message: '请选择一个风格' },
+        { status: 400 }
+      );
+    }
 
     const url = `${API_BASE}/images/generations`;
     
@@ -26,7 +32,7 @@ export async function POST(request: NextRequest) {
       watermark: true
     };
 
-    console.log('图片生成请求参数:', payload);
+    console.log('发送图片生成请求...');
 
     const response = await fetch(url, {
       method: 'POST',
@@ -37,13 +43,24 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify(payload)
     });
 
+    console.log('响应状态码:', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('API 错误:', errorText);
+      return NextResponse.json(
+        { success: false, message: `API 请求失败: ${response.status}` },
+        { status: response.status }
+      );
+    }
+
     const result = await response.json();
-    console.log('图片生成 API 响应:', result);
+    console.log('API 响应:', result);
 
     if (result.data && result.data.length > 0) {
       const imageUrl = result.data[0].url;
       
-      console.log('图片生成成功，URL:', imageUrl);
+      console.log('图片生成成功');
       
       return NextResponse.json({
         success: true,
@@ -52,11 +69,12 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    throw new Error('图片生成失败');
+    throw new Error('API 响应格式错误');
   } catch (error) {
     console.error('图片生成失败:', error);
+    const errorMessage = error instanceof Error ? error.message : '未知错误';
     return NextResponse.json(
-      { success: false, message: '图片生成失败' },
+      { success: false, message: errorMessage },
       { status: 500 }
     );
   }
