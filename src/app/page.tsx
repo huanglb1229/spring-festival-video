@@ -6,6 +6,7 @@ import { styles, type Style } from '@/data/styles';
 export default function Home() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedStyle, setSelectedStyle] = useState<Style | null>(null);
+  const [customDialogue, setCustomDialogue] = useState<string[]>([]);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [generatedVideo, setGeneratedVideo] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
@@ -29,6 +30,30 @@ export default function Home() {
         alert('图片读取失败，请重试');
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleStyleSelect = (style: Style) => {
+    setSelectedStyle(style);
+    setCustomDialogue([...style.dialogue]);
+    setGeneratedImage(null);
+    setGeneratedVideo(null);
+  };
+
+  const handleDialogueChange = (index: number, value: string) => {
+    const newDialogue = [...customDialogue];
+    newDialogue[index] = value;
+    setCustomDialogue(newDialogue);
+  };
+
+  const addDialogueLine = () => {
+    setCustomDialogue([...customDialogue, '']);
+  };
+
+  const removeDialogueLine = (index: number) => {
+    if (customDialogue.length > 1) {
+      const newDialogue = customDialogue.filter((_, i) => i !== index);
+      setCustomDialogue(newDialogue);
     }
   };
 
@@ -74,6 +99,11 @@ export default function Home() {
     setIsGeneratingVideo(true);
     
     try {
+      const styleWithCustomDialogue = {
+        ...selectedStyle,
+        dialogue: customDialogue.filter(line => line.trim() !== '')
+      };
+      
       const response = await fetch('/api/generate-video', {
         method: 'POST',
         headers: {
@@ -81,7 +111,7 @@ export default function Home() {
         },
         body: JSON.stringify({
           image: generatedImage,
-          style: selectedStyle,
+          style: styleWithCustomDialogue,
         }),
       });
 
@@ -226,7 +256,7 @@ export default function Home() {
               {styles.map((style) => (
                 <div
                   key={style.id}
-                  onClick={() => setSelectedStyle(style)}
+                  onClick={() => handleStyleSelect(style)}
                   className={`relative cursor-pointer rounded-2xl overflow-hidden border-2 transition-all duration-300 group ${
                     selectedStyle?.id === style.id
                       ? 'border-red-500 scale-105 shadow-2xl shadow-red-500/20'
@@ -254,20 +284,42 @@ export default function Home() {
 
             {selectedStyle && (
               <div className="mt-6 p-5 bg-gradient-to-br from-yellow-500/10 to-orange-500/10 rounded-2xl border border-yellow-500/20">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-8 h-8 bg-yellow-500/20 rounded-full flex items-center justify-center">
-                    <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-yellow-500/20 rounded-full flex items-center justify-center">
+                      <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <h3 className="font-bold text-yellow-400">拜年台词（可编辑）</h3>
                   </div>
-                  <h3 className="font-bold text-yellow-400">拜年台词</h3>
+                  <button
+                    onClick={addDialogueLine}
+                    className="px-3 py-1 bg-green-600 hover:bg-green-500 text-white text-sm font-bold rounded-xl transition-all duration-300 hover:scale-105"
+                  >
+                    + 添加
+                  </button>
                 </div>
                 <div className="space-y-2">
-                  {selectedStyle.dialogue.map((line, index) => (
-                    <p key={index} className="text-gray-300 text-lg">
-                      <span className="text-red-400 font-bold">「</span>{line}<span className="text-red-400 font-bold">」</span>
-                    </p>
+                  {customDialogue.map((line, index) => (
+                    <div key={index} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={line}
+                        onChange={(e) => handleDialogueChange(index, e.target.value)}
+                        placeholder="输入拜年台词..."
+                        className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-yellow-500 transition-all duration-300"
+                      />
+                      <button
+                        onClick={() => removeDialogueLine(index)}
+                        className="px-3 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl transition-all duration-300 hover:scale-105"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>
